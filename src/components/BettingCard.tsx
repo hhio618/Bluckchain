@@ -1,59 +1,83 @@
-// src/components/BettingCard.tsx
-import React from "react";
-import { makeStyles, createStyles } from "@mui/styles";
+import React, { useState, useContext } from "react";
 import {
   Card,
   CardContent,
   CardActions,
-  Button,
   CardMedia,
   Typography,
+  Button,
+  IconButton,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import BetSlipContext from "../providers/BetSlipProvider";
 
-const useStyles = makeStyles(() =>
-  createStyles({
-    card: {
-      width: "100%",
-      marginBottom: 20,
-      backgroundColor: "#002b36", // Background color from Solarized Dark
-      overflow: "hidden", // Hide overflow to prevent scrollbars
-    },
-    content: {
-      color: "#839496", // Text color from Solarized Dark
-    },
-    action: {
-      backgroundColor: "#073642", // Action button background from Solarized Dark
-    },
-  }),
-);
-
-interface BettingCardProps {
-  title: string;
-  image: string;
+interface BetOption {
+  optionId: string;
+  label: string;
+  odds: number;
+  cryptoIconUrl: string;
 }
 
-const BettingCard: React.FC<BettingCardProps> = ({ title, image }) => {
-  const classes = useStyles();
-  const navigate = useNavigate();
+interface Bet {
+  id: string;
+  title: string;
+  description: string;
+  options: BetOption[];
+  imageUrl: string;
+}
 
-  const handleClick = () => {
-    navigate("/bet/1"); // Navigate to the specific bet page
+const BettingCard: React.FC<Bet> = ({
+  id,
+  title,
+  description,
+  options,
+  imageUrl,
+}) => {
+  const { addBetToSlip, openDrawer } = useContext(BetSlipContext); // Context to manage bet slips and drawer state
+  const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
+
+  const handleBetOptionClick = (option: BetOption) => {
+    addBetToSlip({
+      betId: id,
+      optionId: option.optionId,
+      odds: option.odds,
+      label: option.label,
+      cryptoIconUrl: option.cryptoIconUrl,
+    });
+    setSelectedOptionId(option.optionId);
+    openDrawer(); // Open the bet slip drawer
   };
 
   return (
-    <Card className={classes.card}>
+    <Card sx={{ maxWidth: 345, m: 1 }}>
       <CardMedia
-        image={image} // Image URL passed from props
-        title="Betting Card Image"
+        component="img"
+        height="140"
+        image={imageUrl}
+        alt="Bet Image"
       />
-      <CardContent className={classes.content}>
-        <Typography variant="h5">{title}</Typography>
+      <CardContent>
+        <Typography gutterBottom variant="h5" component="div">
+          {title}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {description}
+        </Typography>
       </CardContent>
-      <CardActions className={classes.action}>
-        <Button size="small" onClick={handleClick}>
-          Go to Bet
-        </Button>
+      <CardActions>
+        {options.map((option) => (
+          <Button
+            key={option.optionId}
+            onClick={() => handleBetOptionClick(option)}
+            variant={
+              selectedOptionId === option.optionId ? "contained" : "outlined"
+            }
+            disabled={
+              selectedOptionId !== null && selectedOptionId !== option.optionId
+            }
+          >
+            {option.label} @ {option.odds}
+          </Button>
+        ))}
       </CardActions>
     </Card>
   );
