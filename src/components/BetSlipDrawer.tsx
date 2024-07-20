@@ -11,6 +11,8 @@ import {
   Divider,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import { BetSlipContext } from "../providers/BetSlipProvider";
+import { useContext } from "react";
 
 interface BetSlip {
   betId: string;
@@ -24,7 +26,8 @@ interface Props {
   betSlips: BetSlip[];
 }
 
-const BetSlipDrawer: React.FC<Props> = ({ isOpen, onClose, betSlips }) => {
+const BetSlipDrawer: React.FC<Props> = () => {
+  const { drawerIsOpen, closeDrawer, betSlips } = useContext(BetSlipContext);
   const [bets, setBets] = useState<{ [key: string]: number }>({});
 
   const handleBetAmountChange = (betId: string, amount: number) => {
@@ -38,8 +41,8 @@ const BetSlipDrawer: React.FC<Props> = ({ isOpen, onClose, betSlips }) => {
   return (
     <Drawer
       anchor="right"
-      open={isOpen}
-      onClose={onClose}
+      open={drawerIsOpen}
+      onClose={closeDrawer}
       sx={{
         width: 250,
         "& .MuiDrawer-paper": { width: 250, boxSizing: "border-box" },
@@ -54,7 +57,7 @@ const BetSlipDrawer: React.FC<Props> = ({ isOpen, onClose, betSlips }) => {
           height: "100%",
         }}
       >
-        <IconButton onClick={onClose} sx={{ marginLeft: "auto" }}>
+        <IconButton onClick={closeDrawer} sx={{ marginLeft: "auto" }}>
           <CloseIcon />
         </IconButton>
         <Typography variant="h6" sx={{ mt: 1, mb: 2 }}>

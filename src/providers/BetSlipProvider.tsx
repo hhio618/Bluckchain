@@ -1,4 +1,5 @@
 import React, { createContext, useState, ReactNode } from "react";
+import { useContext } from "react";
 
 interface BetSlipOption {
   betId: string;
@@ -13,35 +14,39 @@ interface BetSlipContextType {
   addBetToSlip: (option: BetSlipOption) => void;
   openDrawer: () => void;
   closeDrawer: () => void;
+  drawerIsOpen: boolean;
 }
 
-const BetSlipContext = createContext<BetSlipContextType>(null!); // Ensure to initialize correctly
+export const BetSlipContext = createContext<BetSlipContextType>(
+  {} as BetSlipContextType,
+);
 
 export const BetSlipProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
   const [betSlips, setBetSlips] = useState<BetSlipOption[]>([]);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerIsOpen, setDrawerIsOpen] = useState(false);
 
   const addBetToSlip = (option: BetSlipOption) => {
-    setBetSlips((current) => [...current, option]);
+    setBetSlips([...betSlips, option]);
+    openDrawer();
   };
 
   const openDrawer = () => {
-    setDrawerOpen(true);
+    setDrawerIsOpen(true);
   };
 
   const closeDrawer = () => {
-    setDrawerOpen(false);
+    setDrawerIsOpen(false);
   };
 
   return (
     <BetSlipContext.Provider
-      value={{ betSlips, addBetToSlip, openDrawer, closeDrawer }}
+      value={{ betSlips, addBetToSlip, openDrawer, closeDrawer, drawerIsOpen }}
     >
       {children}
     </BetSlipContext.Provider>
   );
 };
 
-export default BetSlipContext;
+export const useBetSlip = () => useContext(BetSlipContext);
