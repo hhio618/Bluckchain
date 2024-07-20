@@ -1,5 +1,4 @@
-import React, { createContext, useState, ReactNode } from "react";
-import { useContext } from "react";
+import React, { createContext, useState, ReactNode, useContext } from "react";
 
 interface BetSlipOption {
   betId: string;
@@ -12,6 +11,8 @@ interface BetSlipOption {
 interface BetSlipContextType {
   betSlips: BetSlipOption[];
   addBetToSlip: (option: BetSlipOption) => void;
+  removeBetFromSlip: (betId: string) => void; // Function to remove a bet slip by betId
+  clearAllBets: () => void; // Function to clear all bets from the slip
   openDrawer: () => void;
   closeDrawer: () => void;
   drawerIsOpen: boolean;
@@ -28,8 +29,16 @@ export const BetSlipProvider: React.FC<{ children: ReactNode }> = ({
   const [drawerIsOpen, setDrawerIsOpen] = useState(false);
 
   const addBetToSlip = (option: BetSlipOption) => {
-    setBetSlips([...betSlips, option]);
+    setBetSlips((prev) => [...prev, option]);
     openDrawer();
+  };
+
+  const removeBetFromSlip = (betId: string) => {
+    setBetSlips((prev) => prev.filter((bet) => bet.betId !== betId));
+  };
+
+  const clearAllBets = () => {
+    setBetSlips([]); // Clears all bets from the state
   };
 
   const openDrawer = () => {
@@ -42,7 +51,15 @@ export const BetSlipProvider: React.FC<{ children: ReactNode }> = ({
 
   return (
     <BetSlipContext.Provider
-      value={{ betSlips, addBetToSlip, openDrawer, closeDrawer, drawerIsOpen }}
+      value={{
+        betSlips,
+        addBetToSlip,
+        removeBetFromSlip,
+        clearAllBets,
+        openDrawer,
+        closeDrawer,
+        drawerIsOpen,
+      }}
     >
       {children}
     </BetSlipContext.Provider>

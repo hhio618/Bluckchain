@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 import {
   Drawer,
   Box,
@@ -11,8 +11,9 @@ import {
   Divider,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import DeleteIcon from "@mui/icons-material/Delete";
+import ClearAllIcon from "@mui/icons-material/ClearAll";
 import { BetSlipContext } from "../providers/BetSlipProvider";
-import { useContext } from "react";
 
 interface BetSlip {
   betId: string;
@@ -20,14 +21,14 @@ interface BetSlip {
   cryptoIconUrl: string; // URL to the crypto icon image
 }
 
-interface Props {
-  isOpen: boolean;
-  onClose: () => void;
-  betSlips: BetSlip[];
-}
-
-const BetSlipDrawer: React.FC<Props> = () => {
-  const { drawerIsOpen, closeDrawer, betSlips } = useContext(BetSlipContext);
+const BetSlipDrawer: React.FC = () => {
+  const {
+    drawerIsOpen,
+    closeDrawer,
+    betSlips,
+    removeBetFromSlip,
+    clearAllBets,
+  } = useContext(BetSlipContext);
   const [bets, setBets] = useState<{ [key: string]: number }>({});
 
   const handleBetAmountChange = (betId: string, amount: number) => {
@@ -57,13 +58,18 @@ const BetSlipDrawer: React.FC<Props> = () => {
           height: "100%",
         }}
       >
-        <IconButton onClick={closeDrawer} sx={{ marginLeft: "auto" }}>
-          <CloseIcon />
-        </IconButton>
-        <Typography variant="h6" sx={{ mt: 1, mb: 2 }}>
-          Your Bet Slip
-        </Typography>
-        <Divider />
+        <Box sx={{ display: "flex", alignItems: "center" }}>
+          <Typography variant="h6" sx={{ flexGrow: 1 }}>
+            Your Bet Slip
+          </Typography>
+          <IconButton onClick={clearAllBets}>
+            <ClearAllIcon />
+          </IconButton>
+          <IconButton onClick={closeDrawer}>
+            <CloseIcon />
+          </IconButton>
+        </Box>
+        <Divider sx={{ my: 1 }} />
         <List sx={{ flexGrow: 1, overflow: "auto" }}>
           {betSlips.map((bet) => (
             <ListItem
@@ -95,13 +101,19 @@ const BetSlipDrawer: React.FC<Props> = () => {
                   fullWidth
                   label="Bet Amount"
                 />
+                <IconButton
+                  onClick={() => removeBetFromSlip(bet.betId)}
+                  sx={{ ml: "auto" }}
+                >
+                  <DeleteIcon />
+                </IconButton>
               </Box>
               <Typography variant="body2">Odds: {bet.odds}</Typography>
               <Typography variant="body2">
                 Potential Payout: ₿
                 {calculatePayout(bet.odds, bets[bet.betId] || 0).toFixed(2)}
               </Typography>
-              <Divider sx={{ width: "100%", mt: 1, mb: 1 }} />
+              <Divider sx={{ width: "100%", mt: 1 }} />
             </ListItem>
           ))}
         </List>

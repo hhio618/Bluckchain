@@ -136,12 +136,7 @@ const DappPage: React.FC = () => {
               </ListItem>
             </List>
           </Drawer>
-          <BetSlipDrawer
-            isOpen={betSlipOpen}
-            onClose={() => setBetSlipOpen(false)}
-            betSlips={[]}
-          />{" "}
-          {/* Render BetSlipDrawer */}
+          <BetSlipDrawer /> {/* Render BetSlipDrawer */}
           <Container
             maxWidth="xl"
             sx={{
