@@ -13,7 +13,7 @@ contract PredictionMarketTest is Test {
     function setUp() public {
         owner = address(this);
         eventOracle = new EventOracle();
-        predictionMarket = new PredictionMarket(address(eventOracle));
+        predictionMarket = new PredictionMarket(address(eventOracle), address(0));
     }
 
     function testCreateEventAndMarket() public {

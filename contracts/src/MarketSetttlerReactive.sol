@@ -13,7 +13,7 @@ contract OracleReactive is IReactive {
     uint256 private constant SEPOLIA_CHAIN_ID = 11155111;
 
 
-    uint256 private constant DATA_UPDATED_TOPIC_0 = 0x7f7c53560eed5d6aab9db16abd65f6a8b3ed69d910c5e8e8842215596ffc6d78;
+    uint256 private constant EVENT_SETTLED_TOPIC_0 = 0x73c08c7fbb4102254cad83cf325b0e5065e821b6b2fbd6c6e3776a49581707a1;
 
     uint64 private constant CALLBACK_GAS_LIMIT = 1000000;
 
@@ -40,7 +40,7 @@ contract OracleReactive is IReactive {
             "subscribe(uint256,address,uint256,uint256,uint256,uint256)",
             SEPOLIA_CHAIN_ID,
             0,
-            DATA_UPDATED_TOPIC_0,
+            EVENT_SETTLED_TOPIC_0,
             REACTIVE_IGNORE,
             REACTIVE_IGNORE,
             REACTIVE_IGNORE
@@ -77,9 +77,9 @@ function react(
     uint256 block_number,
     uint256 /* op_code */
 ) external vmOnly {
-    if (topic_0 == DATA_UPDATED_TOPIC_0) {
+    if (topic_0 == EVENT_SETTLED_TOPIC_0) {
         bytes memory payload = abi.encodeWithSignature(
-            "updateData(uint256)",
+            "settleMarket(uint256)",
             topic_1
         );
         emit Callback(chain_id, l1, CALLBACK_GAS_LIMIT, payload);

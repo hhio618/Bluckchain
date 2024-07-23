@@ -6,6 +6,7 @@ import "./EventOracle.sol";
 
 contract PredictionMarket is Ownable {
     EventOracle public eventOracle;
+    address private callback_sender;
 
     struct BetSlip {
         address better;
@@ -30,8 +31,16 @@ contract PredictionMarket is Ownable {
     event BetPlaced(uint256 indexed marketId, address indexed better, uint256 outcome, uint256 amount);
     event MarketSettled(uint256 indexed marketId, uint256 outcome);
 
-    constructor(address _eventOracle) Ownable(msg.sender) {
+    constructor(address _eventOracle, address _callback_sender) Ownable(msg.sender) {
         eventOracle = EventOracle(_eventOracle);
+      callback_sender = _callback_sender;
+    }
+
+    modifier onlyReactive() {
+        if (callback_sender != address(0)) {
+            require(msg.sender == callback_sender, 'Unauthorized');
+        }
+        _;
     }
 
     function createMarket(uint256 _eventId) public onlyOwner {
@@ -58,7 +67,7 @@ contract PredictionMarket is Ownable {
         emit BetPlaced(_marketId, msg.sender, _outcome, msg.value);
     }
 
-    function settleMarket(uint256 _marketId) public onlyOwner {
+    function settleMarket(uint256 _marketId) public onlyReactive {
         Market storage market = markets[_marketId];
         require(!market.settled, "Market already settled");
 
@@ -91,6 +100,69 @@ contract PredictionMarket is Ownable {
         accumulatedFees = 0;
         (bool success, ) = owner().call{value: amount}("");
         require(success, "Withdrawal failed");
+    }
+
+
+    function getMarketDetails(uint256 _marketId) public view returns (
+        uint256 eventId,
+        uint256 totalBets,
+        bool marketSettled,
+        uint256 outcome,
+        string memory description,
+        uint256 endTime,
+        bool eventSettled,
+        uint256 eventOutcome,
+        string[] memory outcomeNames
+    ) {
+        Market storage market = markets[_marketId];
+        (description, endTime, eventSettled, eventOutcome, outcomeNames) = eventOracle.getEventDetails(market.eventId);
+
+        return (
+            market.eventId,
+            market.totalBets,
+            market.settled,
+            eventOutcome,
+            description,
+            endTime,
+            eventSettled,
+            eventOutcome,
+            outcomeNames
+        );
+    }
+
+    function getMarkets(bool _settled) public view returns (
+        uint256[] memory marketIds,
+        uint256[] memory eventIds,
+        uint256[] memory totalBets,
+        bool[] memory marketSettled,
+        uint256[] memory outcomes
+    ) {
+        uint256 count = 0;
+        for (uint256 i = 1; i <= marketCount; i++) {
+            if (markets[i].settled == _settled) {
+                count++;
+            }
+        }
+
+        marketIds = new uint256[](count);
+        eventIds = new uint256[](count);
+        totalBets = new uint256[](count);
+        marketSettled = new bool[](count);
+        outcomes = new uint256[](count);
+
+        uint256 index = 0;
+        for (uint256 i = 1; i <= marketCount; i++) {
+            if (markets[i].settled == _settled) {
+                marketIds[index] = i;
+                eventIds[index] = markets[i].eventId;
+                totalBets[index] = markets[i].totalBets;
+                marketSettled[index] = markets[i].settled;
+                outcomes[index] = markets[i].outcomeTotals[markets[i].eventId];
+                index++;
+            }
+        }
+
+        return (marketIds, eventIds, totalBets, marketSettled, outcomes);
     }
 
     function getMarketTotalBets(uint256 _marketId) public view returns (uint256) {
