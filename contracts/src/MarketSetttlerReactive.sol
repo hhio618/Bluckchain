@@ -2,8 +2,8 @@
 
 pragma solidity >=0.8.0;
 
-import '../../IReactive.sol';
-import '../../ISubscriptionService.sol';
+import './reactive/IReactive.sol';
+import './reactive/ISubscriptionService.sol';
 
 
 contract OracleReactive is IReactive {
