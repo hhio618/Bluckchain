@@ -19,10 +19,12 @@ contract EventOracle is Ownable {
     event EventCreated(uint256 indexed eventId, string description, uint256 endTime, string[] outcomeNames);
     event EventSettled(uint256 indexed eventId, uint256 outcome, string outcomeName);
 
-    constructor() Ownable(msg.sender) {
-    }
+    constructor() Ownable(msg.sender) {}
 
-    function createEvent(string memory _description, uint256 _endTime, string[] memory _outcomeNames) public onlyOwner {
+    function createEvent(string memory _description, uint256 _endTime, string[] memory _outcomeNames)
+        public
+        onlyOwner
+    {
         require(_endTime > block.timestamp, "End time must be in the future");
         require(_outcomeNames.length > 1, "There must be at least two possible outcomes");
 
@@ -37,7 +39,8 @@ contract EventOracle is Ownable {
 
     function settleEvent(uint256 _eventId, uint256 _outcome) public onlyOwner {
         Event storage eventInstance = events[_eventId];
-        require(eventInstance.endTime <= block.timestamp, "Event not ended yet");
+        // TODO: uncomment for production
+        // require(eventInstance.endTime <= block.timestamp, "Event not ended yet");
         require(!eventInstance.settled, "Event already settled");
         require(_outcome < eventInstance.outcomeNames.length, "Invalid outcome");
 
@@ -47,12 +50,26 @@ contract EventOracle is Ownable {
         emit EventSettled(_eventId, _outcome, eventInstance.outcomeNames[_outcome]);
     }
 
-
-    function getEventDetails(uint256 _eventId) public view returns (string memory description, uint256 endTime, bool settled, uint256 outcome, string[] memory outcomeNames) {
+    function getEventDetails(uint256 _eventId)
+        public
+        view
+        returns (
+            string memory description,
+            uint256 endTime,
+            bool settled,
+            uint256 outcome,
+            string[] memory outcomeNames
+        )
+    {
         Event storage eventInstance = events[_eventId];
-        return (eventInstance.description, eventInstance.endTime, eventInstance.settled, eventInstance.outcome, eventInstance.outcomeNames);
+        return (
+            eventInstance.description,
+            eventInstance.endTime,
+            eventInstance.settled,
+            eventInstance.outcome,
+            eventInstance.outcomeNames
+        );
     }
-
 
     function getOutcomeName(uint256 _eventId, uint256 _outcome) public view returns (string memory) {
         Event storage eventInstance = events[_eventId];

@@ -19,7 +19,8 @@ contract EventOracleTest is Test {
         eventOracle.createEvent("Test Event", block.timestamp + 1 days, outcomeNames);
         assertEq(eventOracle.eventCount(), 1);
 
-        (string memory description, uint256 endTime, bool settled, uint256 outcome, string[] memory outcomes) = eventOracle.getEventDetails(1);
+        (string memory description, uint256 endTime, bool settled, uint256 outcome, string[] memory outcomes) =
+            eventOracle.getEventDetails(1);
         assertEq(description, "Test Event");
         assertEq(endTime, block.timestamp + 1 days);
         assertFalse(settled);
@@ -39,7 +40,7 @@ contract EventOracleTest is Test {
 
         eventOracle.settleEvent(1, 0);
 
-        (, , bool settled, uint256 outcome, ) = eventOracle.getEventDetails(1);
+        (,, bool settled, uint256 outcome,) = eventOracle.getEventDetails(1);
         assertTrue(settled);
         assertEq(outcome, 0);
     }
