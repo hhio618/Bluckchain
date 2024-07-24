@@ -245,10 +245,11 @@ contract PredictionMarketTest is Test {
         vm.stopPrank();
 
         vm.startPrank(user2);
-        vm.deal(user2, 2 ether);
-        predictionMarket.placeBet{value: 2 ether}(marketId, 1);
+        vm.deal(user2, 1 ether);
+        predictionMarket.placeBet{value: 1 ether}(marketId, 1);
         vm.stopPrank();
 
+        vm.warp(block.timestamp + 1 days + 1);
         vm.startPrank(owner);
         eventOracle.settleEvent(eventId, 0);
         predictionMarket.settleMarket(marketId);
@@ -260,10 +261,10 @@ contract PredictionMarketTest is Test {
         assertEq(users.length, 2);
         assertEq(users[0], user1);
         assertEq(totalBets[0], 1 ether);
-        assertEq(prizes[0], 2.97 ether); // 1 ether bet * (3 ether total - 0.03 ether fee) / 1 ether winning total
+        assertEq(prizes[0], 1.994 ether); // 1 ether bet * (2 ether total - 0.006 ether fee) / 1 ether winning total
 
         assertEq(users[1], user2);
-        assertEq(totalBets[1], 2 ether);
+        assertEq(totalBets[1], 1 ether);
         assertEq(prizes[1], 0);
     }
 
@@ -283,8 +284,8 @@ contract PredictionMarketTest is Test {
         vm.stopPrank();
 
         vm.startPrank(user2);
-        vm.deal(user2, 2 ether);
-        predictionMarket.placeBet{value: 2 ether}(marketId, 1);
+        vm.deal(user2, 1 ether);
+        predictionMarket.placeBet{value: 1 ether}(marketId, 1);
         vm.stopPrank();
 
         vm.startPrank(owner);
@@ -297,10 +298,10 @@ contract PredictionMarketTest is Test {
         assertEq(users.length, 2);
         assertEq(users[0], user1);
         assertEq(totalBets[0], 1 ether);
-        assertEq(prizes[0], 2.97 ether); // 1 ether bet * (3 ether total - 0.03 ether fee) / 1 ether winning total
+        assertEq(prizes[0], 1.994 ether); // 1 ether bet * (2 ether total - 0.006 ether fee) / 1 ether winning total
 
         assertEq(users[1], user2);
-        assertEq(totalBets[1], 2 ether);
+        assertEq(totalBets[1], 1 ether);
         assertEq(prizes[1], 0);
     }
 }
