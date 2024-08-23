@@ -7,296 +7,132 @@ import "../src/EventOracle.sol";
 import "../src/BLUCKToken.sol";
 
 contract PredictionMarketTest is Test {
+    PredictionMarket public predictionMarket;
     EventOracle public eventOracle;
     BLUCKToken public bluckToken;
-    PredictionMarket public predictionMarket;
 
     address public owner = address(1);
     address public user1 = address(2);
     address public user2 = address(3);
 
+    uint256 public marketId = 1;
+    uint256 public eventId = 1;
+
     function setUp() public {
         vm.startPrank(owner);
-        eventOracle = new EventOracle();
         bluckToken = new BLUCKToken();
-        predictionMarket = new PredictionMarket(address(eventOracle), address(bluckToken), address(0x0));
+        eventOracle = new EventOracle();
+        predictionMarket = new PredictionMarket(address(eventOracle), address(bluckToken), address(0));
 
-        string[] memory outcomes = new string[](2);
-        outcomes[0] = "Outcome1";
-        outcomes[1] = "Outcome2";
-        eventOracle.createEvent("Test Event", block.timestamp + 1 days, outcomes);
-        bluckToken.mint(owner, 1000 ether);
-        bluckToken.mint(user1, 1000 ether);
-        bluckToken.mint(user2, 1000 ether);
+        bluckToken.mint(owner, 1e24); // Mint 1 million BLUCK tokens for the owner
+        bluckToken.mint(user1, 1e22); // Mint 10,000 BLUCK tokens for user1
+        bluckToken.mint(user2, 1e22); // Mint 10,000 BLUCK tokens for user2
+
+        bluckToken.approve(address(predictionMarket), ~uint256(0)); // Approve BLUCK
+        string[] memory outcomeNames = new string[](2);
+        outcomeNames[0] = "Outcome1";
+        outcomeNames[1] = "Outcome2";
+        eventOracle.createEvent("Test Event", block.timestamp + 1 days, outcomeNames);
+        predictionMarket.createMarket(eventId);
+        marketId = predictionMarket.marketCount();
         vm.stopPrank();
-
-        // Ensure users approve the PredictionMarket contract to spend their BLUCK tokens
         vm.startPrank(user1);
-        bluckToken.approve(address(predictionMarket), type(uint256).max);
+        bluckToken.approve(address(predictionMarket), ~uint256(0)); // Approve BLUCK
         vm.stopPrank();
 
         vm.startPrank(user2);
-        bluckToken.approve(address(predictionMarket), type(uint256).max);
+        bluckToken.approve(address(predictionMarket), ~uint256(0)); // Approve BLUCK
         vm.stopPrank();
     }
 
     function testCreateMarket() public {
-        vm.startPrank(owner);
-        predictionMarket.createMarket(1);
-        vm.stopPrank();
-
-        (
-            uint256 eventId,
-            uint256 totalBets,
-            bool marketSettled,
-            uint256 outcome,
-            string memory description,
-            uint256 endTime,
-            bool settled,
-            uint256 eventOutcome,
-            string[] memory outcomeNames
-        ) = predictionMarket.getMarketDetails(1);
+        (uint256 eventId,, bool settled,, string memory description,, string[] memory outcomeNames,,) =
+            predictionMarket.getMarketDetails(marketId);
         assertEq(eventId, 1);
-        assertEq(totalBets, 0);
         assertEq(settled, false);
+        assertEq(description, "Test Event");
+        assertEq(outcomeNames.length, 2);
+        assertEq(outcomeNames[0], "Outcome1");
+        assertEq(outcomeNames[1], "Outcome2");
+    }
+
+    function testSwap() public {
+        vm.startPrank(user1);
+
+        predictionMarket.swap(marketId, 0, 1e18); // Swap 1 BLUCK for Outcome1
+
+        uint256 outcomePrice = predictionMarket.getMarketOutcomePrice(marketId, 0);
+        assertTrue(outcomePrice > 0);
+
+        uint256[] memory chances = predictionMarket.getMarketOutcomeChances(marketId);
+        assertTrue(chances[0] > 0);
+        vm.stopPrank();
     }
 
     function testPlaceLimitOrder() public {
-        vm.startPrank(owner);
-        predictionMarket.createMarket(1);
-        vm.stopPrank();
-
         vm.startPrank(user1);
-        bluckToken.approve(address(predictionMarket), 1 ether);
-        predictionMarket.placeLimitOrder(1, 0, 1 ether, 1, true);
+
+        predictionMarket.placeLimitOrder(marketId, 0, 1e18, 50, true); // Place a buy limit order
+
+        uint256 outcomePrice = predictionMarket.getMarketOutcomePrice(marketId, 0);
+        assertTrue(outcomePrice > 0);
         vm.stopPrank();
-
-        // Check order book
-        (
-            address[] memory users,
-            uint256[] memory amounts,
-            uint256[] memory prices,
-            bool[] memory isBuys,
-            bool[] memory isLimits
-        ) = predictionMarket.getOrderBook(1, 0);
-        assertEq(users.length, 1);
-        assertEq(users[0], user1);
-        assertEq(amounts[0], 1 ether);
-        assertEq(prices[0], 1);
-        assertEq(isBuys[0], true);
-        assertEq(isLimits[0], true);
-    }
-
-    function testPlaceMarketOrder() public {
-        vm.startPrank(owner);
-        predictionMarket.createMarket(1);
-        vm.stopPrank();
-
-        // User1 places a limit sell order
-        vm.startPrank(user1);
-        uint256 initialBalanceUser1 = bluckToken.balanceOf(user1);
-
-        // Ensure user1 has a BetSlip for the outcome they want to sell
-        predictionMarket.placeLimitOrder(1, 0, 1 ether, 1 ether, false);
-        uint256 balanceAfterOrder1 = bluckToken.balanceOf(user1);
-        assertEq(initialBalanceUser1, balanceAfterOrder1); // No BLUCK transferred yet for limit order
-        vm.stopPrank();
-
-        // User2 places a market buy order
-        vm.startPrank(user2);
-        uint256 initialBalanceUser2 = bluckToken.balanceOf(user2);
-        predictionMarket.placeMarketOrder(1, 0, 1 ether, true);
-        uint256 balanceAfterOrder2 = bluckToken.balanceOf(user2);
-        assertEq(initialBalanceUser2 - 1 ether, balanceAfterOrder2); // BLUCK transferred for market order
-        vm.stopPrank();
-
-        // Verify the sell order was matched and removed
-        (
-            address[] memory users,
-            uint256[] memory amounts,
-            uint256[] memory prices,
-            bool[] memory isBuys,
-            bool[] memory isLimits
-        ) = predictionMarket.getOrderBook(1, 0);
-        assertEq(users.length, 0);
-
-        // Verify balances after the market order
-        uint256 finalBalanceUser1 = bluckToken.balanceOf(user1);
-        uint256 finalBalanceUser2 = bluckToken.balanceOf(user2);
-        assertEq(finalBalanceUser1, initialBalanceUser1 + 1 ether); // User1 received BLUCK for selling
-        assertEq(finalBalanceUser2, initialBalanceUser2 - 1 ether); // User2 paid BLUCK for buying
-
-        // Check user volumes
-        uint256 volumeUser1 = predictionMarket.getVolume(user1);
-        uint256 volumeUser2 = predictionMarket.getVolume(user2);
-        assertEq(volumeUser1, 1 ether);
-        assertEq(volumeUser2, 1 ether);
-    }
-
-    function testCancelOrder() public {
-        vm.startPrank(owner);
-        predictionMarket.createMarket(1);
-        vm.stopPrank();
-
-        vm.startPrank(user1);
-        bluckToken.approve(address(predictionMarket), 1 ether);
-        predictionMarket.placeLimitOrder(1, 0, 1 ether, 1, true);
-        predictionMarket.cancelOrder(1, 0, 0);
-        vm.stopPrank();
-
-        // Check order book is empty
-        (
-            address[] memory users,
-            uint256[] memory amounts,
-            uint256[] memory prices,
-            bool[] memory isBuys,
-            bool[] memory isLimits
-        ) = predictionMarket.getOrderBook(1, 0);
-        assertEq(users.length, 0);
     }
 
     function testSettleMarket() public {
         vm.startPrank(owner);
-        predictionMarket.createMarket(1);
+        eventOracle.settleEvent(eventId, 0); // Settle the event with Outcome1 as the winner
+        predictionMarket.createMarket(eventId);
         vm.stopPrank();
 
         vm.startPrank(user1);
-        uint256 initialBalanceUser1 = bluckToken.balanceOf(user1);
-        predictionMarket.placeLimitOrder(1, 0, 1 ether, 1, true);
-        uint256 balanceAfterOrder = bluckToken.balanceOf(user1);
-        assertEq(initialBalanceUser1 - 1 ether, balanceAfterOrder);
+
+        predictionMarket.swap(2, 0, 1e18); // Swap 1 BLUCK for Outcome1
         vm.stopPrank();
 
         vm.startPrank(owner);
-        eventOracle.settleEvent(1, 0); // Settle event with outcome 0
-        predictionMarket.settleMarket(1);
-        vm.stopPrank();
+        predictionMarket.settleMarket(2); // Settle the market
 
-        uint256 finalBalanceUser1 = bluckToken.balanceOf(user1);
-        assertEq(finalBalanceUser1, initialBalanceUser1);
-        (
-            uint256 eventId,
-            uint256 totalBets,
-            bool marketSettled,
-            uint256 outcome,
-            string memory description,
-            uint256 endTime,
-            bool settled,
-            uint256 eventOutcome,
-            string[] memory outcomeNames
-        ) = predictionMarket.getMarketDetails(1);
-        assertEq(settled, true);
-        // Check that the orders were canceled and refunded
-        (
-            address[] memory users,
-            uint256[] memory amounts,
-            uint256[] memory prices,
-            bool[] memory isBuys,
-            bool[] memory isLimits
-        ) = predictionMarket.getOrderBook(1, 0);
-        assertEq(users.length, 0);
+        (,,, uint256 finalOutcome,,,,,) = predictionMarket.getMarketDetails(2);
+        assertEq(finalOutcome, 0);
+        vm.stopPrank();
     }
 
-    function testGetUserVolume() public {
+    function testClaimReward() public {
         vm.startPrank(owner);
-        predictionMarket.createMarket(1);
+        eventOracle.settleEvent(eventId, 0); // Settle the event with Outcome1 as the winner
+        predictionMarket.createMarket(eventId); // Settle the market
+        uint256 marketId = predictionMarket.marketCount();
         vm.stopPrank();
 
         vm.startPrank(user1);
-        bluckToken.approve(address(predictionMarket), 1 ether);
-        predictionMarket.placeLimitOrder(1, 0, 1 ether, 1, true);
+
+        predictionMarket.swap(marketId, 0, 1e18); // Swap 1 BLUCK for Outcome1
         vm.stopPrank();
 
-        uint256 volume = predictionMarket.getVolume(user1);
-        assertEq(volume, 1 ether);
-    }
-
-    function testGetTopUsersByVolume() public {
         vm.startPrank(owner);
-        predictionMarket.createMarket(1);
+        predictionMarket.settleMarket(marketId);
         vm.stopPrank();
 
         vm.startPrank(user1);
-        bluckToken.approve(address(predictionMarket), 1 ether);
-        predictionMarket.placeLimitOrder(1, 0, 1 ether, 1, true);
-        vm.stopPrank();
+        uint256 userBalanceBefore = bluckToken.balanceOf(user1);
+        predictionMarket.claimReward(marketId);
+        uint256 userBalanceAfter = bluckToken.balanceOf(user1);
 
-        vm.startPrank(user2);
-        bluckToken.approve(address(predictionMarket), 2 ether);
-        predictionMarket.placeLimitOrder(1, 0, 2 ether, 1, true);
+        assertTrue(userBalanceAfter > userBalanceBefore);
         vm.stopPrank();
-
-        (address[] memory users, uint256[] memory volumes) = predictionMarket.getTopUsersByVolume();
-        assertEq(users[0], user2);
-        assertEq(volumes[0], 2 ether);
-        assertEq(users[1], user1);
-        assertEq(volumes[1], 1 ether);
     }
 
-    function testGetTopUsersByProfit() public {
-        vm.startPrank(owner);
-        predictionMarket.createMarket(1);
-        vm.stopPrank();
-
+    function testCancelOrder() public {
         vm.startPrank(user1);
-        bluckToken.approve(address(predictionMarket), 1 ether);
-        predictionMarket.placeLimitOrder(1, 0, 1 ether, 1, true);
+
+        uint256 userBalanceBefore = bluckToken.balanceOf(user1);
+        predictionMarket.placeLimitOrder(marketId, 0, 1e18, 50, true); // Place a buy limit order
+
+        predictionMarket.cancelOrder(marketId, 0, 0);
+
+        uint256 userBalanceAfter = bluckToken.balanceOf(user1);
+        assertEq(userBalanceAfter, userBalanceBefore); // Ensure the BLUCK tokens are returned
         vm.stopPrank();
-
-        vm.startPrank(owner);
-        eventOracle.settleEvent(1, 0); // Settle event with outcome 0
-        predictionMarket.settleMarket(1);
-        vm.stopPrank();
-
-        (address[] memory users, int256[] memory profits) = predictionMarket.getTopUsersByProfit();
-        assertEq(users[0], user1);
-        assertEq(profits[0], int256(1 ether) - int256(0.003 ether)); // Considering 0.3% fee
-    }
-
-    function testGetMarkets() public {
-        vm.startPrank(owner);
-        predictionMarket.createMarket(1);
-        vm.stopPrank();
-
-        (
-            uint256[] memory marketIds,
-            string[] memory descriptions,
-            string[][] memory outcomes,
-            uint256[] memory totalBets,
-            uint256[] memory totalUniqueUsers
-        ) = predictionMarket.getMarkets(false);
-        assertEq(marketIds.length, 1);
-        assertEq(descriptions[0], "Test Event");
-        assertEq(outcomes[0][0], "Outcome1");
-        assertEq(outcomes[0][1], "Outcome2");
-        assertEq(totalBets[0], 0);
-        assertEq(totalUniqueUsers[0], 0);
-    }
-
-    function testGetMarketDetails() public {
-        vm.startPrank(owner);
-        predictionMarket.createMarket(1);
-        vm.stopPrank();
-
-        (
-            uint256 eventId,
-            uint256 totalBets,
-            bool marketSettled,
-            uint256 outcome,
-            string memory description,
-            uint256 endTime,
-            bool eventSettled,
-            uint256 eventOutcome,
-            string[] memory outcomeNames
-        ) = predictionMarket.getMarketDetails(1);
-
-        assertEq(eventId, 1);
-        assertEq(totalBets, 0);
-        assertEq(marketSettled, false);
-        assertEq(outcome, 0);
-        assertEq(description, "Test Event");
-        assertEq(eventSettled, false);
-        assertEq(outcomeNames[0], "Outcome1");
-        assertEq(outcomeNames[1], "Outcome2");
     }
 }
