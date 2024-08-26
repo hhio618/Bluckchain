@@ -1,0 +1,56 @@
+specVersion: 1.0.0
+indexerHints:
+  prune: auto
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: PredictionMarket
+    network: sepolia
+    source:
+      address: "0x8536A305a1a4f538Cc9823c8FfEDf5dd90BD0F80"
+      abi: PredictionMarket
+      startBlock: 6574153
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - BetPlaced
+        - FeesWithdrawn
+        - Log
+        - MarketCreated
+        - MarketSettled
+        - OrderCancelled
+        - OrderMatched
+        - OrderPlaced
+        - OwnershipTransferred
+        - RewardClaimed
+        - Swap
+      abis:
+        - name: PredictionMarket
+          file: ./abis/PredictionMarket.json
+      eventHandlers:
+        - event: BetPlaced(indexed address,indexed uint256,uint256,uint256,uint256)
+          handler: handleBetPlaced
+        - event: FeesWithdrawn(uint256)
+          handler: handleFeesWithdrawn
+        - event: Log(string,uint256)
+          handler: handleLog
+        - event: MarketCreated(indexed uint256,indexed uint256)
+          handler: handleMarketCreated
+        - event: MarketSettled(indexed uint256,uint256)
+          handler: handleMarketSettled
+        - event: OrderCancelled(indexed address,indexed uint256,indexed uint256,uint256,uint256,bool)
+          handler: handleOrderCancelled
+        - event: OrderMatched(indexed uint256,indexed uint256,uint256,uint256,indexed address,address)
+          handler: handleOrderMatched
+        - event: OrderPlaced(indexed uint256,indexed uint256,uint256,uint256,indexed address,bool)
+          handler: handleOrderPlaced
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleOwnershipTransferred
+        - event: RewardClaimed(indexed address,indexed uint256,uint256,uint256,uint256)
+          handler: handleRewardClaimed
+        - event: Swap(indexed uint256,indexed uint256,uint256,uint256,indexed address)
+          handler: handleSwap
+      file: ./src/prediction-market.ts

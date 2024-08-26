@@ -1,5 +1,4 @@
-// src/components/Leaderboard.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Table,
   TableBody,
@@ -13,8 +12,17 @@ import {
   Box,
   Switch,
   FormControlLabel,
+  IconButton,
 } from "@mui/material";
 import { makeStyles, createStyles } from "@mui/styles";
+import SortIcon from "@mui/icons-material/Sort";
+import {
+  useWeb3ModalProvider,
+  useWeb3ModalAccount,
+} from "@web3modal/ethers/react";
+import { ethers, Contract, BrowserProvider } from "ethers";
+import predictionMarketAbi from "../contracts/PredictionMarket.json";
+import { contractAddress } from "../contracts/contract-address";
 
 const useStyles = makeStyles(() =>
   createStyles({
@@ -23,14 +31,14 @@ const useStyles = makeStyles(() =>
     },
     table: {
       minWidth: 650,
-      backgroundColor: "#002b36", // Background color from Solarized Dark
+      backgroundColor: "#002b36",
     },
     header: {
-      backgroundColor: "#073642", // Header background color from Solarized Dark
-      color: "#839496", // Text color from Solarized Dark
+      backgroundColor: "#073642",
+      color: "#839496",
     },
     row: {
-      color: "#839496", // Text color from Solarized Dark
+      color: "#839496",
     },
     switchContainer: {
       display: "flex",
@@ -39,55 +47,86 @@ const useStyles = makeStyles(() =>
       marginBottom: 10,
     },
     switchLabel: {
-      color: "#839496", // Text color for the switch label
+      color: "#839496",
+    },
+    sortButton: {
+      border: "none",
+      background: "none",
+      color: "#839496",
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      "&:hover": {
+        color: "#fff",
+      },
     },
   }),
 );
 
 interface LeaderboardEntry {
-  rank: string;
+  rank: number;
   user: string;
-  coin: string;
-  wagered: number;
-  prize: number;
+  totalBets: number;
+  totalPrizes: number;
 }
-
-const leaderboardData: LeaderboardEntry[] = [
-  { rank: "1", user: "Alice", coin: "BTC", wagered: 120, prize: 1000 },
-  { rank: "2", user: "Bob", coin: "ETH", wagered: 110, prize: 900 },
-  { rank: "3", user: "Charlie", coin: "BTC", wagered: 105, prize: 850 },
-  { rank: "4", user: "David", coin: "ETH", wagered: 95, prize: 800 },
-  // Add more entries as needed
-];
-
-const rankToEmoji = (rank: string) => {
-  switch (rank) {
-    case "1":
-      return "🥇";
-    case "2":
-      return "🥈";
-    case "3":
-      return "🥉";
-    default:
-      return rank;
-  }
-};
 
 const Leaderboard: React.FC = () => {
   const classes = useStyles();
   const [showPrizeInUSD, setShowPrizeInUSD] = useState(false);
+  const [sortKey, setSortKey] = useState<"totalBets" | "totalPrizes">(
+    "totalBets",
+  );
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>(
+    [],
+  );
+  const { isConnected } = useWeb3ModalAccount();
+  const { walletProvider } = useWeb3ModalProvider();
+
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      if (!walletProvider || !isConnected) {
+        console.log("Please connect to a wallet.");
+        return;
+      }
+
+      const ethersProvider = new BrowserProvider(walletProvider);
+      const signer = await ethersProvider.getSigner();
+      const contract = new Contract(
+        contractAddress.PredictionMarket,
+        predictionMarketAbi.abi,
+        signer,
+      );
+
+      try {
+        const [users, totalBets, totalPrizes] =
+          await contract.getUserRankings();
+        const newLeaderboardData = users.map((user: string, index: number) => ({
+          rank: index + 1,
+          user,
+          totalBets: parseInt(totalBets[index].toString(), 10),
+          totalPrizes: parseInt(totalPrizes[index].toString(), 10),
+        }));
+        setLeaderboardData(newLeaderboardData);
+      } catch (error) {
+        console.error("Error fetching leaderboard data:", error);
+      }
+    };
+
+    fetchLeaderboard();
+  }, [isConnected, walletProvider]);
+
+  useEffect(() => {
+    setLeaderboardData((prevData) =>
+      [...prevData].sort((a, b) => b[sortKey] - a[sortKey]),
+    );
+  }, [sortKey]);
 
   const handlePrizeSwitch = (event: React.ChangeEvent<HTMLInputElement>) => {
     setShowPrizeInUSD(event.target.checked);
   };
 
-  const convertToUSD = (prize: number, coin: string) => {
-    // Placeholder conversion rates, replace with real data as needed
-    const conversionRates: { [key: string]: number } = {
-      BTC: 30000,
-      ETH: 2000,
-    };
-    return prize * conversionRates[coin];
+  const convertToUSD = (amount: number) => {
+    return amount * 2000; // Example: convert ETH to USD assuming $2000 per ETH
   };
 
   return (
@@ -114,28 +153,43 @@ const Leaderboard: React.FC = () => {
             <TableRow className={classes.header}>
               <TableCell>Rank</TableCell>
               <TableCell>User</TableCell>
-              <TableCell>Coin</TableCell>
-              <TableCell align="right">Wagered</TableCell>
-              <TableCell align="right">
-                Prize ({showPrizeInUSD ? "USD" : "Coin"})
+              <TableCell align="right" onClick={() => setSortKey("totalBets")}>
+                <button className={classes.sortButton}>
+                  Total Bets <SortIcon fontSize="small" />
+                </button>
+              </TableCell>
+              <TableCell
+                align="right"
+                onClick={() => setSortKey("totalPrizes")}
+              >
+                <button className={classes.sortButton}>
+                  Total Prizes ({showPrizeInUSD ? "USD" : "ETH"}){" "}
+                  <SortIcon fontSize="small" />
+                </button>
               </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {leaderboardData.map((row) => (
-              <TableRow key={row.rank}>
+            {leaderboardData.map((entry) => (
+              <TableRow key={entry.rank}>
                 <TableCell component="th" scope="row" className={classes.row}>
-                  {rankToEmoji(row.rank)}
+                  {entry.rank}
                 </TableCell>
-                <TableCell className={classes.row}>{row.user}</TableCell>
-                <TableCell className={classes.row}>{row.coin}</TableCell>
+                <TableCell className={classes.row}>{entry.user}</TableCell>
                 <TableCell align="right" className={classes.row}>
-                  {row.wagered}
+                  {ethers.formatUnits(entry.totalBets.toString(), 18)}
                 </TableCell>
                 <TableCell align="right" className={classes.row}>
                   {showPrizeInUSD
-                    ? `$${convertToUSD(row.prize, row.coin).toLocaleString()}`
-                    : row.prize}
+                    ? `$${convertToUSD(
+                        parseFloat(
+                          ethers.formatUnits(entry.totalPrizes.toString(), 18),
+                        ),
+                      ).toLocaleString()}`
+                    : `${ethers.formatUnits(
+                        entry.totalPrizes.toString(),
+                        18,
+                      )} ETH`}
                 </TableCell>
               </TableRow>
             ))}

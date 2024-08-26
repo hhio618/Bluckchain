@@ -6,6 +6,7 @@ import LandingPage from "./pages/LandingPage";
 import DappPage from "./pages/DappPage";
 import theme from "./theme";
 import { createWeb3Modal, defaultConfig } from "@web3modal/ethers/react";
+import { BetSlipProvider } from "./providers/BetSlipProvider";
 
 // Initialize Web3Modal
 const initializeWeb3Modal = () => {
@@ -15,7 +16,7 @@ const initializeWeb3Modal = () => {
     name: "Ethereum",
     currency: "ETH",
     explorerUrl: "https://etherscan.io",
-    rpcUrl: "https://cloudflare-eth.com",
+    rpcUrl: "http://127.0.0.1:8545",
   };
 
   const metadata = {
@@ -51,7 +52,14 @@ const App: React.FC = () => {
       <Router>
         <Routes>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/dapp/*" element={<DappPage />} />
+          <Route
+            path="/dapp/*"
+            element={
+              <BetSlipProvider>
+                <DappPage />
+              </BetSlipProvider>
+            }
+          />
         </Routes>
       </Router>
     </ThemeProvider>

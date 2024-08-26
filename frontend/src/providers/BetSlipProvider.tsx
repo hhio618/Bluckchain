@@ -1,6 +1,6 @@
 import React, { createContext, useState, ReactNode, useContext } from "react";
 
-interface BetSlipOption {
+export interface BetSlipOption {
   betId: string;
   optionId: string;
   odds: number;
@@ -15,6 +15,7 @@ interface BetSlipContextType {
   clearAllBets: () => void; // Function to clear all bets from the slip
   openDrawer: () => void;
   closeDrawer: () => void;
+  toggleDrawer: () => void;
   drawerIsOpen: boolean;
 }
 
@@ -49,6 +50,10 @@ export const BetSlipProvider: React.FC<{ children: ReactNode }> = ({
     setDrawerIsOpen(false);
   };
 
+  const toggleDrawer = () => {
+    setDrawerIsOpen(!drawerIsOpen);
+  };
+
   return (
     <BetSlipContext.Provider
       value={{
@@ -58,6 +63,7 @@ export const BetSlipProvider: React.FC<{ children: ReactNode }> = ({
         clearAllBets,
         openDrawer,
         closeDrawer,
+        toggleDrawer,
         drawerIsOpen,
       }}
     >

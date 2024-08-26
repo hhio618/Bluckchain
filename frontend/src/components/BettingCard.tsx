@@ -1,13 +1,8 @@
-// BettingCard.tsx
 import React from "react";
-import {
-  Card,
-  CardContent,
-  CardMedia,
-  Typography,
-  Button,
-} from "@mui/material";
+import { Card, CardContent, Typography, Button, Box } from "@mui/material";
+import BarChartIcon from "@mui/icons-material/BarChart";
 import { useBetSlip } from "../providers/BetSlipProvider";
+import { useNavigate } from "react-router-dom";
 
 interface BetOption {
   optionId: string;
@@ -21,7 +16,8 @@ interface Bet {
   title: string;
   description: string;
   options: BetOption[];
-  imageUrl: string;
+  totalBets: string;
+  totalUniqueUsers: string;
 }
 
 const BettingCard: React.FC<Bet> = ({
@@ -29,9 +25,15 @@ const BettingCard: React.FC<Bet> = ({
   title,
   description,
   options,
-  imageUrl,
+  totalBets,
+  totalUniqueUsers,
 }) => {
+  const navigate = useNavigate();
   const { addBetToSlip } = useBetSlip();
+
+  const goToDetails = () => {
+    navigate(`/dapp/bet/${id}`);
+  };
 
   return (
     <Card
@@ -39,15 +41,10 @@ const BettingCard: React.FC<Bet> = ({
         width: "100%",
         display: "flex",
         flexDirection: "column",
+        marginBottom: 2,
         justifyContent: "space-between",
       }}
     >
-      <CardMedia
-        component="img"
-        image={imageUrl}
-        alt="Bet Image"
-        sx={{ height: 140, objectFit: "cover" }}
-      />
       <CardContent>
         <Typography gutterBottom variant="h5" component="div">
           {title}
@@ -55,17 +52,40 @@ const BettingCard: React.FC<Bet> = ({
         <Typography variant="body2" color="text.secondary">
           {description}
         </Typography>
-        {options.map((option) => (
-          <Button
-            key={option.optionId}
-            onClick={() => addBetToSlip({ ...option, betId: id })}
-            variant="outlined"
-            sx={{ mr: 1, mt: 1 }}
-          >
-            {option.label} @ {option.odds}
-          </Button>
-        ))}
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            alignItems: "center",
+            mt: 2,
+          }}
+        >
+          <Typography variant="body2">Total Bets: {totalBets} ETH</Typography>
+          <Typography variant="body2">
+            Unique Users: {totalUniqueUsers}
+          </Typography>
+        </Box>
+        <Box sx={{ mt: 2, display: "flex", justifyContent: "space-between" }}>
+          {options.map((option, index) => (
+            <Button
+              key={option.optionId}
+              onClick={() => addBetToSlip({ ...option, betId: id })}
+              variant="outlined"
+              sx={{ width: "48%" }} // Ensures that two buttons fit side by side
+            >
+              {option.label} @ {option.odds}
+            </Button>
+          ))}
+        </Box>
       </CardContent>
+      <Button
+        size="small"
+        onClick={goToDetails}
+        sx={{ alignSelf: "flex-start", m: 1 }}
+      >
+        <BarChartIcon />
+      </Button>
     </Card>
   );
 };

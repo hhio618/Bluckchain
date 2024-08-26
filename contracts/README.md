@@ -110,7 +110,7 @@ export SYSTEM_CONTRACT_ADDR="<YOUR_SYSTEM_CONTRACT_ADDR>"
 First, deploy the origin contract to Sepolia:
 
 ```
-forge create --rpc-url $SEPOLIA_RPC --private-key $SEPOLIA_PRIVATE_KEY src/EventOracle.sol:EventOracle # deployed to 0x979EEa9893304d2584291b59e6bAA1EB624f2220
+forge create --rpc-url $SEPOLIA_RPC --private-key $SEPOLIA_PRIVATE_KEY src/EventOracle.sol:EventOracle # deployed to0x32248392A184380C5361dE01f23163A0EfCaD560
 ```
 
 Assign the deployment address to the environment variable ORIGIN_ADDR.
@@ -118,6 +118,7 @@ Assign the deployment address to the environment variable ORIGIN_ADDR.
 Now deploy the destination contract to Sepolia (Here, the AUTHORIZED_CALLER_ADDRESS should contain the address you intend to authorize for performing callbacks or use 0x0000000000000000000000000000000000000000 to skip this check):
 
 ```
+export BLUCK_TOKEN=0x8536A305a1a4f538Cc9823c8FfEDf5dd90BD0F80
 forge create --rpc-url $SEPOLIA_RPC --private-key $SEPOLIA_PRIVATE_KEY src/PredictionMarket.sol:PredictionMarket --constructor-args $ORACLE_ADDRESS $AUTHORIZED_CALLER_ADDRESS
 ```
 

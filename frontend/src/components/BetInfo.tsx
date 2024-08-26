@@ -1,10 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
-  Grid,
-  Tab,
-  Tabs,
+  Typography,
+  IconButton,
   Table,
   TableBody,
   TableCell,
@@ -12,139 +11,174 @@ import {
   TableHead,
   TableRow,
   Paper,
-  Typography,
-  Button,
-  IconButton,
+  Card,
+  CardContent,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import BettingCard from "./BettingCard";
+import StarIcon from "@mui/icons-material/Star";
+import { ethers, Contract, BrowserProvider } from "ethers";
+import predictionMarketAbi from "../contracts/PredictionMarket.json";
+import { contractAddress } from "../contracts/contract-address";
+import {
+  useWeb3ModalProvider,
+  useWeb3ModalAccount,
+} from "@web3modal/ethers/react";
+import Divider from "@mui/material/Divider";
+import CasinoIcon from "@mui/icons-material/Casino";
 
-interface BetOption {
-  optionId: string;
-  label: string;
-  odds: number;
-  cryptoIconUrl: string; // Each bet option might have a different crypto associated
-}
-
-interface BetDetails {
-  user: string;
-  time: string;
-  odds: number;
-  amount: number;
-}
-
-interface FeaturedBet {
-  title: string;
-  image: string;
+interface MarketDetails {
+  eventId: number;
+  totalBets: string;
+  marketSettled: boolean;
+  outcome: number;
   description: string;
-  options: BetOption[];
+  endTime: string;
+  eventSettled: boolean;
+  eventOutcome: number;
+  outcomeNames: string[];
+}
+
+interface BetTopDetail {
+  better: string;
+  amount: string;
+  winningChance: number;
 }
 
 const BetInfo: React.FC = () => {
-  const [tabValue, setTabValue] = useState<number>(0);
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-
-  // Guard clause to handle undefined id
-  if (!id) {
-    return <Typography variant="h6">No bet selected</Typography>;
-  }
-
-  const featuredBet: FeaturedBet = {
-    title: `Bet Details for ID: ${id}`,
-    description: "Detailed information about the bet.",
-    image: "https://via.placeholder.com/1280x720",
-    options: [
-      {
-        optionId: "1a",
-        label: "Option A",
-        odds: 2.0,
-        cryptoIconUrl: "https://via.placeholder.com/50",
-      },
-      {
-        optionId: "1b",
-        label: "Option B",
-        odds: 3.0,
-        cryptoIconUrl: "https://via.placeholder.com/50",
-      },
-    ],
-  };
-
-  const allBets: BetDetails[] = [
-    { user: "User1", time: "10:00", odds: 1.5, amount: 100 },
-    { user: "User2", time: "10:30", odds: 1.8, amount: 150 },
-  ];
-
-  const topBets: BetDetails[] = [
-    { user: "User2", time: "10:30", odds: 1.8, amount: 150 },
-  ];
-
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
-  };
-
-  const renderTable = (bets: BetDetails[]) => (
-    <TableContainer component={Paper}>
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableCell>User</TableCell>
-            <TableCell align="right">Time</TableCell>
-            <TableCell align="right">Odds</TableCell>
-            <TableCell align="right">Bet Amount</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {bets.map((bet, index) => (
-            <TableRow key={index}>
-              <TableCell component="th" scope="row">
-                {bet.user}
-              </TableCell>
-              <TableCell align="right">{bet.time}</TableCell>
-              <TableCell align="right">{bet.odds}</TableCell>
-              <TableCell align="right">{bet.amount}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
+  const [topBets, setTopBets] = useState<BetTopDetail[]>([]);
+  const [marketDetails, setMarketDetails] = useState<MarketDetails | null>(
+    null,
   );
+  const { id } = useParams<{ id?: string }>();
+  const navigate = useNavigate();
+  const { isConnected } = useWeb3ModalAccount();
+  const { walletProvider } = useWeb3ModalProvider();
+
+  useEffect(() => {
+    const fetchTopBets = async () => {
+      if (!walletProvider || !isConnected || !id) {
+        console.log("Please connect to a wallet or check the bet ID.");
+        return;
+      }
+
+      const ethersProvider = new BrowserProvider(walletProvider);
+      const signer = await ethersProvider.getSigner();
+      const contract = new Contract(
+        contractAddress.PredictionMarket,
+        predictionMarketAbi.abi,
+        signer,
+      );
+      try {
+        const details = await contract.getMarketDetails(parseInt(id));
+        setMarketDetails({
+          eventId: details[0],
+          totalBets: ethers.formatEther(details[1].toString()),
+          marketSettled: details[2],
+          outcome: details[3],
+          description: details[4],
+          endTime: new Date(details[5] * 1000).toLocaleString(),
+          eventSettled: details[6],
+          eventOutcome: details[7],
+          outcomeNames: details[8],
+        });
+      } catch (error) {
+        console.error("Error fetching market details:", error);
+      }
+
+      try {
+        const [bets, winningChances] = await contract.getTopBets(parseInt(id));
+        setTopBets(
+          bets.map((bet: any, index: number) => ({
+            better: bet.better,
+            amount: ethers.formatEther(bet.amount.toString()).toString(),
+            winningChance: winningChances[index].toFixed(2) + "%",
+          })),
+        );
+      } catch (error) {
+        console.error("Error fetching top bets:", error);
+      }
+    };
+
+    fetchTopBets();
+  }, [id, isConnected, walletProvider]);
 
   const handleBack = () => {
-    navigate("/dapp/sport-events");
+    navigate(-1);
   };
 
   return (
-    <Box sx={{ flexGrow: 1 }}>
-      <IconButton
-        onClick={handleBack}
-        sx={{ mb: 2 }}
-        aria-label="back to sports events"
-      >
+    <Box sx={{ flexGrow: 1, p: 3 }}>
+      <IconButton onClick={handleBack} sx={{ mb: 2 }}>
         <ArrowBackIcon />
       </IconButton>
-      <Grid container spacing={2}>
-        <Grid item xs={12}>
-          <BettingCard
-            id={id}
-            title={featuredBet.title}
-            description={featuredBet.description}
-            options={featuredBet.options}
-            imageUrl={featuredBet.image}
-          />
-        </Grid>
-        <Grid item xs={12}>
-          <Tabs
-            value={tabValue}
-            onChange={handleTabChange}
-            aria-label="bet tabs"
-          >
-            <Tab label="All Bets" />
-            <Tab label="Top Bets" />
-          </Tabs>
-          {tabValue === 0 ? renderTable(allBets) : renderTable(topBets)}
-        </Grid>
-      </Grid>
+      <Typography
+        variant="h4"
+        gutterBottom
+        sx={{ display: "flex", alignItems: "center" }}
+      >
+        <CasinoIcon sx={{ mr: 1 }} /> Market Details
+      </Typography>
+      <Divider sx={{ mb: 2 }} />
+      {marketDetails && (
+        <Card>
+          <CardContent>
+            <Typography variant="h5">{marketDetails.description}</Typography>
+            <Typography variant="body2">
+              Total Bets: {marketDetails.totalBets} ETH
+            </Typography>
+            <Typography variant="body2">
+              Outcome: {marketDetails.outcomeNames.join(", ")}
+            </Typography>
+            <Typography variant="body2">
+              Event Settled: {marketDetails.eventSettled ? "Yes" : "No"}
+            </Typography>
+          </CardContent>
+        </Card>
+      )}
+      <Typography
+        variant="h4"
+        gutterBottom
+        sx={{ display: "flex", alignItems: "center" }}
+      >
+        <CasinoIcon sx={{ mr: 1 }} /> Top Bets
+      </Typography>
+      <Divider sx={{ mb: 2 }} />
+      <Card>
+        <CardContent>
+          <TableContainer component={Paper}>
+            <Table aria-label="top bets table">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Rank</TableCell>
+                  <TableCell>User</TableCell>
+                  <TableCell align="right">Bet Amount (ETH)</TableCell>
+                  <TableCell align="right">Winning Chance</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {topBets.map((entry, index) => (
+                  <TableRow key={index}>
+                    <TableCell component="th" scope="row">
+                      {index === 0 ? (
+                        <StarIcon color="primary" />
+                      ) : index === 1 ? (
+                        <StarIcon color="secondary" />
+                      ) : index === 2 ? (
+                        <StarIcon color="action" />
+                      ) : (
+                        index + 1
+                      )}
+                    </TableCell>
+                    <TableCell>{entry.better}</TableCell>
+                    <TableCell align="right">{entry.amount}</TableCell>
+                    <TableCell align="right">{entry.winningChance}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </CardContent>
+      </Card>
     </Box>
   );
 };

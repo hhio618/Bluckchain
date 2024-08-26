@@ -1,4 +1,9 @@
 import React, { useContext, useState } from "react";
+import { ethers, BrowserProvider, Contract } from "ethers";
+import {
+  useWeb3ModalProvider,
+  useWeb3ModalAccount,
+} from "@web3modal/ethers/react";
 import {
   Drawer,
   Box,
@@ -8,124 +13,113 @@ import {
   ListItem,
   TextField,
   Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Divider,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
-import ClearAllIcon from "@mui/icons-material/ClearAll";
-import { BetSlipContext } from "../providers/BetSlipProvider";
+import { BetSlipContext, BetSlipOption } from "../providers/BetSlipProvider";
+import predictionMarketAbi from "../contracts/PredictionMarket.json";
+import { contractAddress } from "../contracts/contract-address";
 
-interface BetSlip {
-  betId: string;
-  odds: number;
-  cryptoIconUrl: string; // URL to the crypto icon image
-}
+const BetSlipDrawer = () => {
+  const { drawerIsOpen, closeDrawer, betSlips, removeBetFromSlip } =
+    useContext(BetSlipContext);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [selectedBet, setSelectedBet] = useState<BetSlipOption>();
+  const [betAmount, setBetAmount] = useState("");
+  const { address, chainId, isConnected } = useWeb3ModalAccount();
+  const { walletProvider } = useWeb3ModalProvider();
 
-const BetSlipDrawer: React.FC = () => {
-  const {
-    drawerIsOpen,
-    closeDrawer,
-    betSlips,
-    removeBetFromSlip,
-    clearAllBets,
-  } = useContext(BetSlipContext);
-  const [bets, setBets] = useState<{ [key: string]: number }>({});
-
-  const handleBetAmountChange = (betId: string, amount: number) => {
-    setBets({ ...bets, [betId]: amount });
+  // Open the dialog to place a bet
+  const handleOpenBetDialog = (bet: BetSlipOption) => {
+    setSelectedBet(bet);
+    setOpenDialog(true);
   };
 
-  const calculatePayout = (odds: number, amount: number): number => {
-    return odds * amount;
+  // Close the dialog
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setBetAmount("");
+  };
+
+  // Function to handle the actual placing of a bet
+  const placeBet = async () => {
+    if (!walletProvider || !isConnected) {
+      console.log("Please connect to a wallet.");
+      return;
+    }
+    if (!selectedBet) return;
+
+    try {
+      // Assuming BrowserProvider correctly wraps around the standard provider and can be used directly.
+      const provider = new BrowserProvider(walletProvider);
+      await provider.send("eth_requestAccounts", []);
+      const signer = await provider.getSigner();
+      const contract = new Contract(
+        contractAddress.PredictionMarket,
+        predictionMarketAbi.abi,
+        signer,
+      );
+      console.log("marketId: ", selectedBet.betId);
+      console.log("outcomeId: ", selectedBet.optionId);
+      const transaction = await contract.placeBet(
+        ethers.toBigInt(selectedBet.betId),
+        ethers.toBigInt(selectedBet.optionId),
+        { value: ethers.parseEther(betAmount) },
+      );
+      await transaction.wait();
+      handleCloseDialog();
+      alert("Bet placed successfully!");
+    } catch (error) {
+      console.error("Failed to place bet:", error);
+      alert("Error placing bet. See console for details.");
+    }
   };
 
   return (
-    <Drawer
-      anchor="right"
-      open={drawerIsOpen}
-      onClose={closeDrawer}
-      sx={{
-        width: 250,
-        "& .MuiDrawer-paper": { width: 250, boxSizing: "border-box" },
-      }}
-    >
-      <Box
-        sx={{
-          width: 250,
-          p: 2,
-          display: "flex",
-          flexDirection: "column",
-          height: "100%",
-        }}
-      >
-        <Box sx={{ display: "flex", alignItems: "center" }}>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            Your Bet Slip
-          </Typography>
-          <IconButton onClick={clearAllBets}>
-            <ClearAllIcon />
-          </IconButton>
-          <IconButton onClick={closeDrawer}>
-            <CloseIcon />
-          </IconButton>
-        </Box>
-        <Divider sx={{ my: 1 }} />
-        <List sx={{ flexGrow: 1, overflow: "auto" }}>
-          {betSlips.map((bet) => (
-            <ListItem
-              key={bet.betId}
-              sx={{ flexDirection: "column", alignItems: "start" }}
-            >
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  width: "100%",
-                  mb: 1,
-                }}
-              >
-                <img
-                  src={bet.cryptoIconUrl}
-                  alt="Crypto"
-                  style={{ height: 24, marginRight: 8 }}
-                />
-                <TextField
-                  type="number"
-                  size="small"
-                  variant="outlined"
-                  value={bets[bet.betId] || ""}
-                  onChange={(e) =>
-                    handleBetAmountChange(bet.betId, parseFloat(e.target.value))
-                  }
-                  InputProps={{ startAdornment: "₿" }}
-                  fullWidth
-                  label="Bet Amount"
-                />
-                <IconButton
-                  onClick={() => removeBetFromSlip(bet.betId)}
-                  sx={{ ml: "auto" }}
-                >
-                  <DeleteIcon />
-                </IconButton>
-              </Box>
-              <Typography variant="body2">Odds: {bet.odds}</Typography>
-              <Typography variant="body2">
-                Potential Payout: ₿
-                {calculatePayout(bet.odds, bets[bet.betId] || 0).toFixed(2)}
-              </Typography>
-              <Divider sx={{ width: "100%", mt: 1 }} />
-            </ListItem>
-          ))}
-        </List>
-        <Button
-          variant="contained"
-          color="primary"
-          fullWidth
-          sx={{ mt: "auto" }}
-        >
-          Place Bet
-        </Button>
-      </Box>
+    <Drawer anchor="right" open={drawerIsOpen} onClose={closeDrawer}>
+      {/* Existing drawer content */}
+      <Dialog open={openDialog} onClose={handleCloseDialog}>
+        <DialogTitle>Place Bet</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Enter the amount of ETH you want to bet.
+          </DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Bet Amount (ETH)"
+            type="number"
+            fullWidth
+            variant="outlined"
+            value={betAmount}
+            onChange={(e) => setBetAmount(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog}>Cancel</Button>
+          <Button onClick={placeBet} color="primary">
+            Place Bet
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* List of bets */}
+      <List>
+        {betSlips.map((bet) => (
+          <ListItem key={bet.betId}>
+            <Typography>{`Bet on ${bet.label} with odds ${bet.odds}`}</Typography>
+            <Button variant="outlined" onClick={() => handleOpenBetDialog(bet)}>
+              Place Bet
+            </Button>
+          </ListItem>
+        ))}
+      </List>
     </Drawer>
   );
 };
