@@ -1,118 +1,51 @@
-type BetPlaced @entity(immutable: true) {
-  id: Bytes!
-  user: Bytes! # address
-  marketId: BigInt! # uint256
-  outcome: BigInt! # uint256
-  shares: BigInt! # uint256
-  price: BigInt! # uint256
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
+type Market @entity {
+  id: ID!
+  eventId: BigInt!
+  totalLocked: BigInt!
+  outcomeLocked: [BigInt!]!
+  outcomePrices: [BigInt!]!
+  outcomeShares: [BigInt!]!
+  totalShares: BigInt!
+  finalOutcome: BigInt
+  settled: Boolean!
+  orders: [Order!] @derivedFrom(field: "market")
+  bets: [Bet!] @derivedFrom(field: "market")
+  topShareHolders: [User!]! @derivedFrom(field: "markets")
 }
 
-type FeesWithdrawn @entity(immutable: true) {
-  id: Bytes!
-  amount: BigInt! # uint256
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
+type User @entity {
+  id: ID!
+  volumeTraded: BigInt!
+  unsettledVolume: BigInt!
+  profit: BigInt!
+  potentialProfit: BigInt!
+  markets: [Market!]! @derivedFrom(field: "topShareHolders")
+  orders: [Order!] @derivedFrom(field: "trader")
+  bets: [Bet!] @derivedFrom(field: "user")
 }
 
-type Log @entity(immutable: true) {
-  id: Bytes!
-  log: String! # string
-  value: BigInt! # uint256
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
+type Order @entity {
+  id: ID!
+  trader: User!
+  market: Market!
+  outcome: BigInt!
+  share: BigInt!
+  price: BigInt!
+  isBuy: Boolean!
+  isLimit: Boolean!
+  timestamp: BigInt!
 }
 
-type MarketCreated @entity(immutable: true) {
-  id: Bytes!
-  marketId: BigInt! # uint256
-  eventId: BigInt! # uint256
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type MarketSettled @entity(immutable: true) {
-  id: Bytes!
-  marketId: BigInt! # uint256
-  outcome: BigInt! # uint256
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type OrderCancelled @entity(immutable: true) {
-  id: Bytes!
-  trader: Bytes! # address
-  marketId: BigInt! # uint256
-  outcome: BigInt! # uint256
-  amount: BigInt! # uint256
-  price: BigInt! # uint256
-  isBuy: Boolean! # bool
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type OrderMatched @entity(immutable: true) {
-  id: Bytes!
-  marketId: BigInt! # uint256
-  outcome: BigInt! # uint256
-  amount: BigInt! # uint256
-  price: BigInt! # uint256
-  buyer: Bytes! # address
-  seller: Bytes! # address
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type OrderPlaced @entity(immutable: true) {
-  id: Bytes!
-  marketId: BigInt! # uint256
-  outcome: BigInt! # uint256
-  amount: BigInt! # uint256
-  price: BigInt! # uint256
-  trader: Bytes! # address
-  isLimit: Boolean! # bool
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type OwnershipTransferred @entity(immutable: true) {
-  id: Bytes!
-  previousOwner: Bytes! # address
-  newOwner: Bytes! # address
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type RewardClaimed @entity(immutable: true) {
-  id: Bytes!
-  user: Bytes! # address
-  marketId: BigInt! # uint256
-  outcome: BigInt! # uint256
-  shares: BigInt! # uint256
-  reward: BigInt! # uint256
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type Swap @entity(immutable: true) {
-  id: Bytes!
-  marketId: BigInt! # uint256
-  outcome: BigInt! # uint256
-  amountIn: BigInt! # uint256
-  amountOut: BigInt! # uint256
-  trader: Bytes! # address
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
+type Bet @entity {
+  id: ID!
+  user: User!
+  market: Market!
+  outcome: BigInt!
+  shares: BigInt!
+  price: BigInt!
+  valueIn: BigInt!
+  valueOut: BigInt!
+  profit: BigInt!
+  loss: BigInt!
+  timestamp: BigInt!
 }

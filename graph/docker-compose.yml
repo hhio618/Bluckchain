@@ -19,8 +19,21 @@ services:
       postgres_pass: let-me-in
       postgres_db: graph-node
       ipfs: "ipfs:5001"
-      ethereum: "mainnet:http://host.docker.internal:8545"
-      GRAPH_LOG: info
+      ethereum: "mainnet:http://anvil:8545"
+      GRAPH_LOG: debug
+
+  #  ganache:
+  #    image: trufflesuite/ganache-cli
+  #    ports:
+  #      - "8545:8545"
+  #    command: -i 15 --gasLimit 8000000 --deterministic
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:latest
+    ports:
+      - "8545:8545"
+    command: anvil -b 2
+    environment:
+      ANVIL_IP_ADDR: 0.0.0.0
   ipfs:
     image: ipfs/kubo:v0.17.0
     ports:

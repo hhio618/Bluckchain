@@ -1,200 +1,154 @@
 import {
-  BetPlaced as BetPlacedEvent,
-  FeesWithdrawn as FeesWithdrawnEvent,
-  Log as LogEvent,
-  MarketCreated as MarketCreatedEvent,
-  MarketSettled as MarketSettledEvent,
-  OrderCancelled as OrderCancelledEvent,
-  OrderMatched as OrderMatchedEvent,
-  OrderPlaced as OrderPlacedEvent,
-  OwnershipTransferred as OwnershipTransferredEvent,
-  RewardClaimed as RewardClaimedEvent,
-  Swap as SwapEvent
-} from "../generated/PredictionMarket/PredictionMarket"
-import {
-  BetPlaced,
-  FeesWithdrawn,
-  Log,
   MarketCreated,
-  MarketSettled,
-  OrderCancelled,
-  OrderMatched,
   OrderPlaced,
-  OwnershipTransferred,
+  OrderMatched,
+  OrderCancelled,
+  MarketSettled,
   RewardClaimed,
-  Swap
-} from "../generated/schema"
+  Swap,
+  PredictionMarket,
+} from "../generated/PredictionMarket/PredictionMarket";
+import { Market, User, Order, Bet } from "../generated/schema";
+import { BigInt, log } from "@graphprotocol/graph-ts";
 
-export function handleBetPlaced(event: BetPlacedEvent): void {
-  let entity = new BetPlaced(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.user = event.params.user
-  entity.marketId = event.params.marketId
-  entity.outcome = event.params.outcome
-  entity.shares = event.params.shares
-  entity.price = event.params.price
-
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
+export function handleMarketCreated(event: MarketCreated): void {
+  let market = new Market(event.params.marketId.toString());
+  market.eventId = event.params.eventId;
+  market.totalLocked = BigInt.fromI32(0);
+  market.outcomeLocked = [];
+  market.outcomePrices = [];
+  market.totalShares = BigInt.fromI32(0);
+  market.settled = false;
+  market.save();
 }
 
-export function handleFeesWithdrawn(event: FeesWithdrawnEvent): void {
-  let entity = new FeesWithdrawn(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.amount = event.params.amount
+export function handleOrderPlaced(event: OrderPlaced): void {
+  let order = new Order(
+    event.transaction.hash.toHex() + "-" + event.logIndex.toString(),
+  );
+  order.trader = event.params.trader.toHex();
+  order.market = event.params.marketId.toString();
+  order.outcome = event.params.outcome;
+  order.share = event.params.amount;
+  order.price = event.params.price;
+  order.isBuy = event.params.isLimit;
+  order.isLimit = true;
+  order.timestamp = event.block.timestamp;
+  order.save();
 
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
+  // Update user and market stats
+  let user = User.load(event.params.trader.toHex());
+  if (user == null) {
+    user = new User(event.params.trader.toHex());
+    user.volumeTraded = BigInt.fromI32(0);
+    user.unsettledVolume = BigInt.fromI32(0);
+    user.profit = BigInt.fromI32(0);
+    user.potentialProfit = BigInt.fromI32(0);
+  }
+  user.volumeTraded = user.volumeTraded.plus(order.share.times(order.price));
+  user.save();
 }
 
-export function handleLog(event: LogEvent): void {
-  let entity = new Log(event.transaction.hash.concatI32(event.logIndex.toI32()))
-  entity.log = event.params.log
-  entity.value = event.params.value
+export function handleOrderMatched(event: OrderMatched): void {
+  let order = Order.load(
+    event.transaction.hash.toHex() + "-" + event.logIndex.toString(),
+  );
+  if (order) {
+    order.share = order.share.minus(event.params.amount);
+    if (order.share.equals(BigInt.fromI32(0))) {
+      order.save();
+    }
+  }
 
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
+  // Update user's unsettled volume
+  let user = User.load(event.params.buyer.toHex());
+  if (user == null) {
+    user = new User(event.params.buyer.toHex());
+    user.volumeTraded = BigInt.fromI32(0);
+    user.unsettledVolume = BigInt.fromI32(0);
+    user.profit = BigInt.fromI32(0);
+    user.potentialProfit = BigInt.fromI32(0);
+  }
+  user.unsettledVolume = user.unsettledVolume.plus(
+    event.params.amount.times(event.params.price),
+  );
+  user.save();
 }
 
-export function handleMarketCreated(event: MarketCreatedEvent): void {
-  let entity = new MarketCreated(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.marketId = event.params.marketId
-  entity.eventId = event.params.eventId
+export function handleOrderCancelled(event: OrderCancelled): void {
+  let order = Order.load(
+    event.transaction.hash.toHex() + "-" + event.logIndex.toString(),
+  );
+  if (order) {
+    order.share = BigInt.fromI32(0);
+    order.save();
+  }
 
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
+  // Update user's unsettled volume
+  let user = User.load(event.params.trader.toHex());
+  if (user == null) {
+    user = new User(event.params.trader.toHex());
+    user.volumeTraded = BigInt.fromI32(0);
+    user.unsettledVolume = BigInt.fromI32(0);
+    user.profit = BigInt.fromI32(0);
+    user.potentialProfit = BigInt.fromI32(0);
+  }
+  user.unsettledVolume = user.unsettledVolume.minus(
+    event.params.amount.times(event.params.price),
+  );
+  user.save();
 }
 
-export function handleMarketSettled(event: MarketSettledEvent): void {
-  let entity = new MarketSettled(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.marketId = event.params.marketId
-  entity.outcome = event.params.outcome
-
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
+export function handleMarketSettled(event: MarketSettled): void {
+  let market = Market.load(event.params.marketId.toString());
+  if (market != null) {
+    market.settled = true;
+    market.finalOutcome = event.params.outcome;
+    market.save();
+  }
 }
 
-export function handleOrderCancelled(event: OrderCancelledEvent): void {
-  let entity = new OrderCancelled(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.trader = event.params.trader
-  entity.marketId = event.params.marketId
-  entity.outcome = event.params.outcome
-  entity.amount = event.params.amount
-  entity.price = event.params.price
-  entity.isBuy = event.params.isBuy
-
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
+export function handleRewardClaimed(event: RewardClaimed): void {
+  let user = User.load(event.params.user.toHex());
+  if (user != null) {
+    user.profit = user.profit.plus(event.params.reward);
+    user.save();
+  }
 }
 
-export function handleOrderMatched(event: OrderMatchedEvent): void {
-  let entity = new OrderMatched(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.marketId = event.params.marketId
-  entity.outcome = event.params.outcome
-  entity.amount = event.params.amount
-  entity.price = event.params.price
-  entity.buyer = event.params.buyer
-  entity.seller = event.params.seller
+export function handleSwap(event: Swap): void {
+  let market = Market.load(event.params.marketId.toString());
+  if (market == null) {
+    log.warning("Market not found: {}", [event.params.marketId.toString()]);
+    return;
+  }
 
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
+  let user = User.load(event.params.trader.toHex());
+  if (user == null) {
+    user = new User(event.params.trader.toHex());
+    user.volumeTraded = BigInt.fromI32(0);
+    user.unsettledVolume = BigInt.fromI32(0);
+    user.profit = BigInt.fromI32(0);
+    user.potentialProfit = BigInt.fromI32(0);
+  }
 
-  entity.save()
-}
+  // Calculate the new outcome price and update user shares
+  let outcomePrice = market.outcomePrices[event.params.outcome.toI32()];
+  let potentialProfit = outcomePrice
+    .times(event.params.amountOut)
+    .minus(event.params.amountIn);
+  user.potentialProfit = user.potentialProfit.plus(potentialProfit);
+  user.save();
 
-export function handleOrderPlaced(event: OrderPlacedEvent): void {
-  let entity = new OrderPlaced(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.marketId = event.params.marketId
-  entity.outcome = event.params.outcome
-  entity.amount = event.params.amount
-  entity.price = event.params.price
-  entity.trader = event.params.trader
-  entity.isLimit = event.params.isLimit
+  // Update market stats
+  market.totalLocked = market.totalLocked.plus(event.params.amountIn);
+  market.outcomeLocked[event.params.outcome.toI32()] = market.outcomeLocked[
+    event.params.outcome.toI32()
+  ].plus(event.params.amountIn);
+  market.totalShares = market.totalShares.plus(event.params.amountOut);
 
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
-}
-
-export function handleOwnershipTransferred(
-  event: OwnershipTransferredEvent
-): void {
-  let entity = new OwnershipTransferred(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.previousOwner = event.params.previousOwner
-  entity.newOwner = event.params.newOwner
-
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
-}
-
-export function handleRewardClaimed(event: RewardClaimedEvent): void {
-  let entity = new RewardClaimed(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.user = event.params.user
-  entity.marketId = event.params.marketId
-  entity.outcome = event.params.outcome
-  entity.shares = event.params.shares
-  entity.reward = event.params.reward
-
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
-}
-
-export function handleSwap(event: SwapEvent): void {
-  let entity = new Swap(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.marketId = event.params.marketId
-  entity.outcome = event.params.outcome
-  entity.amountIn = event.params.amountIn
-  entity.amountOut = event.params.amountOut
-  entity.trader = event.params.trader
-
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
+  // market.outcomeShares[event.params.outcome.toI32()] = market.outcomeShares[
+  //  event.params.outcome.toI32()
+  // ].plus(event.params.amountOut);
+  market.save();
 }
